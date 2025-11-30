@@ -46,6 +46,7 @@ let voice_synth = null;
 const unblockUI = () => {
   document.getElementById("recordAudio").classList.remove("disabled");
   document.getElementById("playSampleAudio").classList.remove("disabled");
+  document.getElementById("playSampleAudioRight").classList.remove("disabled");
   document.getElementById("buttonNext").onclick = () => getNextSample();
   document.getElementById("nextButtonDiv").classList.remove("disabled");
   document.getElementById("original_script").classList.remove("disabled");
@@ -58,6 +59,7 @@ const unblockUI = () => {
 const blockUI = () => {
   document.getElementById("recordAudio").classList.add("disabled");
   document.getElementById("playSampleAudio").classList.add("disabled");
+  document.getElementById("playSampleAudioRight").classList.add("disabled");
   document.getElementById("buttonNext").onclick = null;
   document.getElementById("original_script").classList.add("disabled");
   document.getElementById("playRecordedAudio").classList.add("disabled");
@@ -133,7 +135,7 @@ const cacheSoundFiles1 = async () => {
     console.error("Lỗi khi preload sound files:", err);
   }
 };
-  const getNextSample = async () => {
+const getNextSample = async () => {
   blockUI();
 
   if (!serverIsInitialized) await initializeServer();
@@ -171,7 +173,7 @@ const cacheSoundFiles1 = async () => {
       body: JSON.stringify({
         category: sample_difficult.toString(),
         language: AILanguage,
-        question: "is", 
+        question: " favorite", 
       }),
       headers: { "X-Api-Key": STScoreAPIKey },
     })
@@ -456,7 +458,66 @@ const playAudio = async () => {
   playWithMozillaApi(currentText[0]);
   document.getElementById("main_title").innerHTML = "Current Sound was played";
 };
+const playAudioRight = async () => {
+  document.getElementById("main_title").innerHTML = "Generating sound...";
 
+  try {
+    // Lấy câu hiện tại trực tiếp từ DOM
+    let text = document.getElementById("original_script").innerHTML;
+    text = text.replace(/<[^>]*>?/gm, "").trim().replace(/\s\s+/g, " ");
+
+    // Gửi text lên server để sinh audio (không dùng Silero, dùng gTTS)
+    const res = await fetch(apiMainPathSample + "/getAudioFromText", {
+      method: "post",
+      body: JSON.stringify({
+        value: text,
+      }),
+      headers: { "X-Api-Key": STScoreAPIKey },
+    });
+
+    const responseData = await res.json();
+    console.log("TTS response:", responseData);
+
+    // Lambda handler trả về {statusCode, body: {...}, headers}
+    // body có thể là object hoặc JSON string
+    let data;
+    if (responseData.body) {
+      if (typeof responseData.body === 'string') {
+        // Nếu body là string, parse nó
+        data = JSON.parse(responseData.body);
+      } else {
+        // Nếu body đã là object, dùng trực tiếp
+        data = responseData.body;
+      }
+    } else if (responseData.wavBase64) {
+      // Nếu wavBase64 nằm trực tiếp trong response
+      data = responseData;
+    } else {
+      data = responseData;
+    }
+
+    if (data && data.wavBase64) {
+      const mimeType = data.mimeType || "audio/mpeg";
+      const audioSrc = `data:${mimeType};base64,` + data.wavBase64;
+      const ttsAudio = new Audio(audioSrc);
+
+      ttsAudio.addEventListener("ended", () => {
+        document.getElementById("main_title").innerHTML =
+          "Current Sound was played";
+      });
+
+      await ttsAudio.play();
+    } else {
+      console.error("No wavBase64 field in response:", data);
+      document.getElementById("main_title").innerHTML =
+        "Error: could not play sound";
+    }
+  } catch (e) {
+    console.error("Error while playing TTS audio:", e);
+    document.getElementById("main_title").innerHTML =
+      "Error: could not play sound";
+  }
+};
 function playback() {
   const playSound = ctx.createBufferSource();
   playSound.buffer = currentAudioForPlaying;

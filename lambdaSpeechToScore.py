@@ -17,6 +17,10 @@ import tempfile
 import os
 import subprocess
 from pydub import AudioSegment
+import librosa
+import numpy as np
+from scipy.signal import butter, lfilter
+import soundfile as sf
 trainer_SST_lambda = {}
 trainer_SST_lambda['en'] = pronunciationTrainer.getTrainer("en")
 trainer_SST_lambda['en-gb'] = pronunciationTrainer.getTrainer("en-gb")
@@ -65,12 +69,31 @@ def lambda_handler(event, context):
     stderr=subprocess.DEVNULL,
     check=True  # đảm bảo ffmpeg báo lỗi nếu thất bại
     )
+    
+    # 🔹 Lọc tạp âm trước khi xử lý
+    # print("🔧 Đang lọc tạp âm...")
+    # try:
+    #     cleaned_audio, cleaned_sr = clean_voice(tmp_wav_path)
+    #     # Lưu lại file đã lọc vào tmp_wav_path (ghi đè)
+    #     sf.write(tmp_wav_path, cleaned_audio, cleaned_sr)
+    #     # Cập nhật signal từ file đã lọc để đồng bộ
+    #     signal = cleaned_audio
+    #     fs = cleaned_sr
+    #     print("✅ Đã lọc tạp âm xong")
+    # except Exception as e:
+    #     print(f"⚠️ Lỗi khi lọc tạp âm: {e}, tiếp tục với file gốc")
+    #     # Nếu lỗi, tiếp tục với file gốc (signal và fs đã có sẵn)
+    
     try:
         print("🔍 Đang gọi model để chấm điểm...")
-        # ✅ Gọi model xử lý từ đường dẫn file .wav
-        signal = transform(torch.Tensor(signal)).unsqueeze(0)
+        # ✅ Gọi model xử lý từ đường dẫn file .wav (đã được lọc tạp âm)
+        # Resample signal về 16kHz nếu cần (file đã được convert về 16kHz bằng ffmpeg)
+        if fs != 16000:
+            signal_tensor = transform(torch.Tensor(signal)).unsqueeze(0)
+        else:
+            signal_tensor = torch.Tensor(signal).unsqueeze(0)
         result = trainer_SST_lambda[language].processAudioForGivenText(
-            tmp_wav_path, signal , real_text, language
+            tmp_wav_path, signal_tensor, real_text, language
         )
     finally:
         # Dọn file tạm .wav sau khi xong
@@ -126,6 +149,44 @@ def lambda_handler(event, context):
 
 
 
+# Tạo bộ lọc Butterworth
+def butter_filter(data, cutoff, sr, btype, order=4):
+    nyq = 0.5 * sr
+    normal_cutoff = cutoff / nyq
+    
+    # Đảm bảo normal_cutoff nằm trong khoảng hợp lệ (0 < Wn < 1)
+    if normal_cutoff >= 1.0:
+        # Nếu cutoff >= Nyquist, giảm xuống 95% của Nyquist để an toàn
+        normal_cutoff = 0.95
+    elif normal_cutoff <= 0:
+        # Nếu cutoff <= 0, đặt giá trị tối thiểu
+        normal_cutoff = 0.01
+    
+    b, a = butter(order, normal_cutoff, btype=btype)
+    return lfilter(b, a, data)
+
+# Lọc tạp âm nâng cao
+def clean_voice(path):
+    """
+    Lọc tạp âm từ file audio:
+    - High-pass filter để giảm rung nền
+    - Low-pass filter để giảm hiss
+    - Noise gate để loại bỏ tín hiệu yếu
+    """
+    y, sr = librosa.load(path, sr=None)
+
+    # High-pass để giảm rung nền
+    y = butter_filter(y, 80, sr, "high")
+
+    # Low-pass để giảm hiss (đảm bảo cutoff < Nyquist frequency)
+    # Với sr=16kHz, Nyquist=8kHz, nên dùng 7000 Hz để an toàn
+    lowpass_cutoff = min(7000, 0.9 * (sr / 2))
+    y = butter_filter(y, lowpass_cutoff, sr, "low")
+
+    # Noise gate: loại bỏ tín hiệu yếu hơn ngưỡng
+    y = np.where(np.abs(y) < 0.015, 0, y)
+
+    return y, sr
 
 def audioread_load(path, offset=0.0, duration=None, dtype=np.float32, text=None):
     """Load an audio buffer using audioread.

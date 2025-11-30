@@ -222,11 +222,6 @@ def get_phonemes(filepath):
         print("✅ Nhận kết quả thành công!")
         print("📦 Raw result:", text)
         
-        # Return empty string if result is too short or invalid
-        if len(text.strip()) <= 2:
-            print("Warning: Very short phoneme result, returning empty string")
-            return ""
-            
         return text
         
     except Exception as e:

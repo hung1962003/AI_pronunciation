@@ -33,14 +33,12 @@ def getTrainer(language: str):
 class PronunciationTrainer:
     current_transcript: str
     current_ipa: str
-
     current_recorded_audio: torch.Tensor
     current_recorded_transcript: str
     current_recorded_word_locations: list
     current_recorded_intonations: torch.tensor
     current_words_pronunciation_accuracy = []
     categories_thresholds = np.array([80, 60, 59])
-
     sampling_rate = 16000
 
     def __init__(self, asr_model: mi.IASRModel, word_to_ipa_coverter: mi.ITextToPhonemModel) -> None:

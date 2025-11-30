@@ -1,31 +1,45 @@
 
-import models
-import soundfile as sf
 import json
-import AIModels
-#from flask import Response
-import utilsFileIO
 import os
 import base64
 
-sampling_rate = 16000
-model_TTS_lambda = AIModels.NeuralTTS(models.getTTSModel('en'), sampling_rate)
+from gtts import gTTS
+
+import utilsFileIO
 
 
 def lambda_handler(event, context):
 
-    body = json.loads(event['body'])
+    # Parse body from API Gateway / Flask-style event
+    try:
+        body = json.loads(event.get('body', '{}'))
+    except Exception:
+        body = {}
 
-    text_string = body['value']
-# tensor [0.5000000, -0.2500000, 1.0000000]
-# numpy ['0.5', '-0.25', '1']
+    # Hỗ trợ cả key 'value' (TTS) và 'title' (cho thống nhất với các API khác)
+    text_string = body.get('value') or body.get('title')
 
-    linear_factor = 0.2
-    audio = model_TTS_lambda.getAudioFromSentence(
-        text_string).detach().numpy()*linear_factor
-    random_file_name = utilsFileIO.generateRandomString(20)+'.wav'
+    if text_string is None:
+        # Không có text để đọc, trả về lỗi rõ ràng thay vì raise exception
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+            },
+            'body': json.dumps(
+                {
+                    "error": "Missing 'value' field in request body"
+                },
+            )
+        }
+    # Generate TTS audio using gTTS (Google Text-to-Speech)
+    # Lưu ý: cần kết nối Internet để gTTS hoạt động
+    random_file_name = utilsFileIO.generateRandomString(20) + ".mp3"
 
-    sf.write('./'+random_file_name, audio, 16000)
+    tts = gTTS(text=text_string, lang="en")
+    tts.save(random_file_name)
 
     with open(random_file_name, "rb") as f:
         audio_byte_array = f.read()
@@ -43,6 +57,7 @@ def lambda_handler(event, context):
         'body': json.dumps(
             {
                 "wavBase64": str(base64.b64encode(audio_byte_array))[2:-1],
+                "mimeType": "audio/mpeg",
             },
         )
     }

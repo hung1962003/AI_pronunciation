@@ -35,18 +35,25 @@ def getTTSModel(language: str) -> nn.Module:
     
     if language == 'en':
         speaker = 'lj_16khz'  # 16 kHz
-        model = torch.hub.load(repo_or_dir='snakers4/silero-models',
-                               model='silero_tts',
-                               language=language,
-                               speaker=speaker)
+        model_obj = torch.hub.load(repo_or_dir='snakers4/silero-models',
+                                   model='silero_tts',
+                                   language=language,
+                                   speaker=speaker)
     elif language == 'en-gb':
         speaker = 'thorsten_v2'  # 16 kHz
-        model = torch.hub.load(repo_or_dir='snakers4/silero-models',
-                               model='silero_tts',
-                               language=language,
-                               speaker=speaker)        
+        model_obj = torch.hub.load(repo_or_dir='snakers4/silero-models',
+                                   model='silero_tts',
+                                   language=language,
+                                   speaker=speaker)        
     else:
         raise ValueError('Language not implemented')
+
+    # torch.hub.load for silero_tts thường trả về tuple (model, example_text, sample_rate, speakers, ...)
+    # Đảm bảo chỉ trả lại chính object model có method `apply_tts`
+    if isinstance(model_obj, tuple):
+        model = model_obj[0]
+    else:
+        model = model_obj
 
     return model
 

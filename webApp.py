@@ -23,7 +23,14 @@ def main():
 @app.route(rootPath+'/getAudioFromText', methods=['POST'])
 def getAudioFromText():
     event = {'body': json.dumps(request.get_json(force=True))}
-    return lambdaTTS.lambda_handler(event, [])
+    lambda_response = lambdaTTS.lambda_handler(event, [])
+    # Parse body từ JSON string thành object để Flask trả về đúng format
+    if isinstance(lambda_response, dict) and 'body' in lambda_response:
+        try:
+            lambda_response['body'] = json.loads(lambda_response['body'])
+        except:
+            pass
+    return lambda_response
 
 
 @app.route(rootPath+'/getSample', methods=['POST'])
