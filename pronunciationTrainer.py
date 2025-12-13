@@ -124,13 +124,11 @@ class PronunciationTrainer:
         result = {'recording_transcript': recording_transcript,
                   'real_and_transcribed_words': real_and_transcribed_words,
                   'recording_ipa': recording_ipa, 'start_time': start_time, 'end_time': end_time,
-                  'real_and_transcribed_words_ipa': real_and_transcribed_words_ipa, 'pronunciation_accuracy': pronunciation_accuracy,
+                  'real_and_transcribed_words_ipa': real_and_transcribed_words_ipa, #'pronunciation_accuracy': pronunciation_accuracy,
                   'pronunciation_categories': pronunciation_categories,
                   'real_text': real_text,
                   'AIFeedback': AIFeedback}
-                  
         print("pronunciation result: " + str(result))
-
         return result
 
     def getAudioTranscript(self, recordedAudio: torch.Tensor = None):
@@ -255,6 +253,16 @@ class PronunciationTrainer:
         return ''.join([char for char in word if char not in punctuation])
 
     def getWordsPronunciationCategory(self, accuracies) -> list:
+          # accuracies có thể là:
+        # - list[float]
+        # - tuple(overall_accuracy, list[float])
+        # - scalar float
+
+        if isinstance(accuracies, tuple) and len(accuracies) == 2:
+            _, accuracies = accuracies
+
+        if np.isscalar(accuracies):
+            accuracies = [float(accuracies)]
         categories = []
 
         for accuracy in accuracies:
@@ -264,6 +272,11 @@ class PronunciationTrainer:
         return categories
 
     def getPronunciationCategoryFromAccuracy(self, accuracy) -> int:
+         # đảm bảo accuracy là scalar
+        if not np.isscalar(accuracy):
+            accuracy = float(np.mean(accuracy))
+        else:
+            accuracy = float(accuracy)
         return np.argmin(abs(self.categories_thresholds-accuracy))
 
     def preprocessAudio(self, audio: torch.tensor) -> torch.tensor:

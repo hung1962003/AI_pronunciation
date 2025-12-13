@@ -5,6 +5,7 @@ from flask_cors import CORS
 import json
 
 import lambdaTTS
+import lambdaTTSOpenAI
 import lambdaSpeechToScore
 import lambdaGetSample
 
@@ -29,6 +30,18 @@ def getAudioFromText():
         try:
             lambda_response['body'] = json.loads(lambda_response['body'])
         except:
+            pass
+    return lambda_response
+
+
+@app.route(rootPath+'/getOpenAIAudioFromText', methods=['POST'])
+def getOpenAIAudioFromText():
+    event = {'body': json.dumps(request.get_json(force=True))}
+    lambda_response = lambdaTTSOpenAI.lambda_handler(event, [])
+    if isinstance(lambda_response, dict) and 'body' in lambda_response:
+        try:
+            lambda_response['body'] = json.loads(lambda_response['body'])
+        except Exception:
             pass
     return lambda_response
 

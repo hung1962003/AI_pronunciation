@@ -26,5 +26,4 @@ class WhisperASRModel(IASRModel):
         return self._transcript
 
     def getWordLocations(self) -> list:
-        
         return self._word_locations

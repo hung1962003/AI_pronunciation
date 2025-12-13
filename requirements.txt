@@ -24,7 +24,5 @@ flask-swagger-ui
 boto3==1.34.23
 sequence_align
 gTTS
+openai>=1.40.0
 pydub
-noisereduce
-librosa
-scipy

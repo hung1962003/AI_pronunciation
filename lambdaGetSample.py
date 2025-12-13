@@ -21,8 +21,8 @@ class TextDataset():
         return self.number_of_samples
 
 
-sample_folder = "./databases/"
-lambda_database = {}
+# sample_folder = "./databases/"
+# lambda_database = {}
 lambda_ipa_converter = {}
 available_languages = ['en','en-gb']
 

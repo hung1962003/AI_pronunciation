@@ -173,7 +173,7 @@ const getNextSample = async () => {
       body: JSON.stringify({
         category: sample_difficult.toString(),
         language: AILanguage,
-        question: " favorite", 
+        question: " The two countries have a lot in common culturally", 
       }),
       headers: { "X-Api-Key": STScoreAPIKey },
     })
@@ -518,6 +518,68 @@ const playAudioRight = async () => {
       "Error: could not play sound";
   }
 };
+
+
+const playOpenAIAudio = async ({
+  voice = "verse",
+  audioFormat = "mp3",
+} = {}) => {
+  document.getElementById("main_title").innerHTML = "Generating sound...";
+
+  try {
+    let text = document.getElementById("original_script").innerHTML;
+    text = text.replace(/<[^>]*>?/gm, "").trim().replace(/\s\s+/g, " ");
+
+    const res = await fetch(apiMainPathSample + "/getOpenAIAudioFromText", {
+      method: "post",
+      body: JSON.stringify({
+        value: text,
+        voice,
+        audioFormat,
+      }),
+      headers: { "X-Api-Key": STScoreAPIKey },
+    });
+
+    const responseData = await res.json();
+    console.log("OpenAI TTS response:", responseData);
+
+    let data;
+    if (responseData.body) {
+      if (typeof responseData.body === "string") {
+        data = JSON.parse(responseData.body);
+      } else {
+        data = responseData.body;
+      }
+    } else if (responseData.wavBase64) {
+      data = responseData;
+    } else {
+      data = responseData;
+    }
+
+    if (data && data.wavBase64) {
+      const mimeType = data.mimeType || "audio/mpeg";
+      const audioSrc = `data:${mimeType};base64,` + data.wavBase64;
+      const ttsAudio = new Audio(audioSrc);
+
+      ttsAudio.addEventListener("ended", () => {
+        document.getElementById("main_title").innerHTML =
+          "Current Sound was played";
+      });
+
+      await ttsAudio.play();
+    } else {
+      console.error("No wavBase64 field in OpenAI response:", data);
+      document.getElementById("main_title").innerHTML =
+        "Error: could not play sound";
+    }
+  } catch (error) {
+    console.error("Error while playing OpenAI TTS audio:", error);
+    document.getElementById("main_title").innerHTML =
+      "Error: could not play sound";
+  }
+};
+
+
 function playback() {
   const playSound = ctx.createBufferSource();
   playSound.buffer = currentAudioForPlaying;

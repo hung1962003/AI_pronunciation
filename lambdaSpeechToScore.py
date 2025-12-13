@@ -17,9 +17,9 @@ import tempfile
 import os
 import subprocess
 from pydub import AudioSegment
-import librosa
+# import librosa
 import numpy as np
-from scipy.signal import butter, lfilter
+# from scipy.signal import butter, lfilter
 import soundfile as sf
 trainer_SST_lambda = {}
 trainer_SST_lambda['en'] = pronunciationTrainer.getTrainer("en")
@@ -115,9 +115,16 @@ def lambda_handler(event, context):
 
     words_real = real_transcripts.lower().split()
     mapped_words = matched_transcripts.split()
-    is_letter_correct_all_words = ''    
-    is_letter_correct_all_words = function.compare_ipa_pairs(real_and_transcribed_words_ipa, return_as_string=True,real_words=result['real_text'])
-    # 
+    is_letter_correct_all_words = ''
+    is_letter_correct_all_words = function.compare_ipa_pairs(
+        real_and_transcribed_words_ipa,
+        return_as_string=True,
+        real_words=result['real_text']
+    )
+
+    total_letters, correct_letters, letters_accuracy_percent = calculate_letter_accuracy(
+        is_letter_correct_all_words
+    )
 
     
     # for idx, word_real in enumerate(words_real):
@@ -136,7 +143,8 @@ def lambda_handler(event, context):
     
     res = {'real_transcript': result['recording_transcript'],
            'ipa_transcript': result['recording_ipa'],
-           'pronunciation_accuracy': str(int(result['pronunciation_accuracy'])),
+           #'pronunciation_accuracy': str(int(result['pronunciation_accuracy'])),
+           'pronunciation_accuracy': letters_accuracy_percent,
            'real_transcripts': real_transcripts, 'matched_transcripts': matched_transcripts,
            'real_transcripts_ipa': real_transcripts_ipa, 'matched_transcripts_ipa': matched_transcripts_ipa,
            'pair_accuracy_category': pair_accuracy_category,
@@ -150,43 +158,60 @@ def lambda_handler(event, context):
 
 
 # Tạo bộ lọc Butterworth
-def butter_filter(data, cutoff, sr, btype, order=4):
-    nyq = 0.5 * sr
-    normal_cutoff = cutoff / nyq
+# def calculate_letter_accuracy(letter_string: str):
+#     """Return total letters, correct letters, and accuracy percent from 1/0 string."""
+#     if not letter_string:
+#         return 0, 0, 0
+
+#     segments = [segment for segment in letter_string.strip().split(' ') if segment]
+#     total_letters = sum(len(segment) for segment in segments)
+#     correct_letters = sum(segment.count('1') for segment in segments)
+
+#     if total_letters == 0:
+#         accuracy_percent = 0
+#     else:
+#         accuracy_percent = round((correct_letters / total_letters) * 100)
+
+#     return total_letters, correct_letters, accuracy_percent
+
+
+# def butter_filter(data, cutoff, sr, btype, order=4):
+#     nyq = 0.5 * sr
+#     normal_cutoff = cutoff / nyq
     
-    # Đảm bảo normal_cutoff nằm trong khoảng hợp lệ (0 < Wn < 1)
-    if normal_cutoff >= 1.0:
-        # Nếu cutoff >= Nyquist, giảm xuống 95% của Nyquist để an toàn
-        normal_cutoff = 0.95
-    elif normal_cutoff <= 0:
-        # Nếu cutoff <= 0, đặt giá trị tối thiểu
-        normal_cutoff = 0.01
+#     # Đảm bảo normal_cutoff nằm trong khoảng hợp lệ (0 < Wn < 1)
+#     if normal_cutoff >= 1.0:
+#         # Nếu cutoff >= Nyquist, giảm xuống 95% của Nyquist để an toàn
+#         normal_cutoff = 0.95
+#     elif normal_cutoff <= 0:
+#         # Nếu cutoff <= 0, đặt giá trị tối thiểu
+#         normal_cutoff = 0.01
     
-    b, a = butter(order, normal_cutoff, btype=btype)
-    return lfilter(b, a, data)
+#     b, a = butter(order, normal_cutoff, btype=btype)
+#     return lfilter(b, a, data)
 
 # Lọc tạp âm nâng cao
-def clean_voice(path):
-    """
-    Lọc tạp âm từ file audio:
-    - High-pass filter để giảm rung nền
-    - Low-pass filter để giảm hiss
-    - Noise gate để loại bỏ tín hiệu yếu
-    """
-    y, sr = librosa.load(path, sr=None)
+# def clean_voice(path):
+#     """
+#     Lọc tạp âm từ file audio:
+#     - High-pass filter để giảm rung nền
+#     - Low-pass filter để giảm hiss
+#     - Noise gate để loại bỏ tín hiệu yếu
+#     """
+#     y, sr = librosa.load(path, sr=None)
 
-    # High-pass để giảm rung nền
-    y = butter_filter(y, 80, sr, "high")
+#     # High-pass để giảm rung nền
+#     y = butter_filter(y, 80, sr, "high")
 
-    # Low-pass để giảm hiss (đảm bảo cutoff < Nyquist frequency)
-    # Với sr=16kHz, Nyquist=8kHz, nên dùng 7000 Hz để an toàn
-    lowpass_cutoff = min(7000, 0.9 * (sr / 2))
-    y = butter_filter(y, lowpass_cutoff, sr, "low")
+#     # Low-pass để giảm hiss (đảm bảo cutoff < Nyquist frequency)
+#     # Với sr=16kHz, Nyquist=8kHz, nên dùng 7000 Hz để an toàn
+#     lowpass_cutoff = min(7000, 0.9 * (sr / 2))
+#     y = butter_filter(y, lowpass_cutoff, sr, "low")
 
-    # Noise gate: loại bỏ tín hiệu yếu hơn ngưỡng
-    y = np.where(np.abs(y) < 0.015, 0, y)
+#     # Noise gate: loại bỏ tín hiệu yếu hơn ngưỡng
+#     y = np.where(np.abs(y) < 0.015, 0, y)
 
-    return y, sr
+#     return y, sr
 
 def audioread_load(path, offset=0.0, duration=None, dtype=np.float32, text=None):
     """Load an audio buffer using audioread.
@@ -247,9 +272,6 @@ def audioread_load(path, offset=0.0, duration=None, dtype=np.float32, text=None)
     #     print("🔍 Đang phân tích trọng âm...")
     #     stress = detect_stress(y, sr_native, text)
     return y, sr_native
-
-
-
 
 def buf_to_float(x, n_bytes=2, dtype=np.float32):
     """Convert an integer buffer to floating point values.

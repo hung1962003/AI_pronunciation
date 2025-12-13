@@ -256,8 +256,31 @@ def align_real_and_transcribed(reference_sequence: str, recorded_sequence: str):
 
     return result    
 def aiFeedback(reference_text, word_comparision_list):
-    system_message = """You are an expert dialect/accent coach for american spoken english. you will provide valuable feedback to improve my american accent. For ease of understanding, I would prefer you give suggestions for mipronunciation using google pronunciation respelling.
-    provide following Overall Impression, Specific Feedback, Google Pronunciation Respelling Suggestions, additional tips"""
+
+
+    valid_word_comparisions = [
+        pair for pair in (word_comparision_list or [])
+        if len(pair) >= 2
+        and pair[1]
+        and pair[1].replace("_", "").replace("-", "").replace(" ", "").strip()
+    ]
+
+    if not valid_word_comparisions:
+        return "Người dùng chưa nói gì nên không thể phân tích được."
+
+    system_message = """You are an expert dialect/accent coach for American spoken English.
+    Respond in Vietnamese (tiếng Việt) and structure output as:
+    1. Overall Impression
+    2. Specific Feedback (liệt kê từng cặp từ so sánh theo dạng "reference_phoneme → recorded_phoneme")
+       - Giải thích rõ điểm sai
+       - Nêu cách phát âm chuẩn cần làm, ví dụ: "i: → i (kéo dài âm /i:/ lâu hơn)"
+    3. How to pronounce the word correctly 
+      - Liệt kê từng từ phát âm sai theo dạng "reference_phoneme → recorded_phoneme".
+      - Mỗi từ chỉ xuất hiện một lần, giải thích rõ lý do sai (khẩu hình, vị trí lưỡi, độ dài, trọng âm...).
+      - Đưa hướng dẫn phát âm đúng cho chính từ đó (mô tả khẩu hình, luồng hơi, ví dụ ngắn nếu cần).
+      - Bỏ qua các từ đã chính xác, không đưa ví dụ chung chung.
+    4. Additional Tips
+    Giữ hướng dẫn ngắn gọn, tập trung vào khẩu hình, độ dài, trọng âm và phối hợp âm."""
     chat_completion = client1.chat.completions.create(
         messages=[
                 {
@@ -268,7 +291,7 @@ def aiFeedback(reference_text, word_comparision_list):
                     "role": "user",
                     "content": f"""Reference Text:  {reference_text}
         ( reference_phoneme, recorded_phoneme) 
-        {word_comparision_list}""",
+        {valid_word_comparisions}""",
                 }
         ],
         model="llama-3.3-70b-versatile",
@@ -276,9 +299,6 @@ def aiFeedback(reference_text, word_comparision_list):
     )
     feedback = chat_completion.choices[0].message.content
     return feedback
-
-
-
 
 def split_ipa_into_phonemes(ipa_string):
     """
@@ -392,7 +412,7 @@ def segment_word_into_graphemes(word: str):
 		"ch","sh","th","ph","ng","qu",
 		"ee","oo","ea","ai","oi","oy","ay","au","aw","oa","ow","ew","ue","ie","ei",
 		"io",  # ví dụ trong pronunciation → /ə/
-		"ear","eer","ure"
+		"ear","eer","ure","te","wh" 
 	]
 	# Sắp xếp giảm dần độ dài để ưu tiên khớp dài nhất
 	locked_multi = sorted(locked_multi, key=len, reverse=True)
@@ -400,16 +420,30 @@ def segment_word_into_graphemes(word: str):
 	i = 0
 	while i < len(lowered):
 		matched = None
-		for pat in locked_multi:
-			if lowered.startswith(pat, i):
-				matched = word[i:i+len(pat)]
-				break
+		# ĐẶC BIỆT: gom cụm 'te' cuối từ (vd 'favorite' → 't'+'e' cùng phát âm /t/)
+		# Chỉ áp dụng khi 'te' nằm ở CUỐI từ để tránh ảnh hưởng các trường hợp khác.
+		if i == len(lowered) - 2 and lowered[i:i+2] == "te":
+			matched = word[i:i+2]
+		else:
+			for pat in locked_multi:
+				if lowered.startswith(pat, i):
+					matched = word[i:i+len(pat)]
+					break
 		if matched:
 			graphemes.append(matched)
 			i += len(matched)
 		else:
-			graphemes.append(word[i])
-			i += 1
+			# Gom các chữ cái lặp liền kề (vd: mm, nn) thành một grapheme để chia sẻ cùng phoneme
+			if i + 1 < len(lowered) and lowered[i] == lowered[i + 1]:
+				j = i + 2
+				while j < len(lowered) and lowered[j] == lowered[i]:
+					j += 1
+				repeated_chunk = word[i:j]
+				graphemes.append(repeated_chunk)
+				i = j
+			else:
+				graphemes.append(word[i])
+				i += 1
 	print("graphemes: ", graphemes)
 	return graphemes
 
@@ -420,6 +454,7 @@ GRAPHEME_EXPECTED_PHONEMES = {
 	"cian": 3,
 	"ture": 3,
 	"sure": 3   ,
+	"te": 1,    # cụm 'te' cuối từ thường tương ứng 1 phoneme /t/
 }
 
 GRAPHEME_LETTER_TO_PHONEME_MAP = {
@@ -428,7 +463,11 @@ GRAPHEME_LETTER_TO_PHONEME_MAP = {
 	"tian": [[0], [1], [1], [2]],
 	"cian": [[0], [1], [1], [2]],
 	"ture": [[0], [1], [2], [2]],   # tu → tʃər or similar
-	"sure": [[0], [1], [2], [2]]
+	"sure": [[0], [1], [2], [2]],
+	# 'te' cuối từ: cả 't' và 'e' cùng chia sẻ 1 phoneme (thường là /t/)
+	"te": [[0], [0]],
+	# 'wh' thường được phát âm là /w/ → cả w và h dùng chung phoneme
+	"wh": [[0], [0]],
 }
 
 def grapheme_expected_phoneme_count(grapheme: str) -> int:
@@ -523,6 +562,17 @@ def map_graphemes_to_phoneme_indices(graphemes, ipa_phonemes_count: int):
 	
 	return mapping
 
+def apply_te_tail_heuristic(letter_result: list, real_word: str, phoneme_result: list) -> list:
+	"""
+	Ensure words ending with 'te' show the same score for both 't' and 'e',
+	because they typically map to a single /t/ phoneme.
+	"""
+	if real_word and len(letter_result) >= 2 and real_word.lower().endswith('te'):
+		last_score = phoneme_result[-1] if phoneme_result else (letter_result[-1] if letter_result else '0')
+		letter_result[-1] = last_score
+		letter_result[-2] = last_score
+	return letter_result
+
 def compare_ipa_pairs(real_and_transcribed_words_ipa, strict_syllable_match: bool = False, return_as_string: bool = False, real_words = None):
     """
     So sánh IPA và trả về kết quả.
@@ -592,7 +642,7 @@ def compare_ipa_pairs(real_and_transcribed_words_ipa, strict_syllable_match: boo
                         found_phoneme = False
                         for ph_idx, ph in enumerate(recorded_phonemes_clean):
                             if recorded_list[i] == ph[0] and ph_idx >= recorded_phoneme_idx:
-                                # Nếu có phoneme khác bắt đầu bằng ký tự này
+                                # Nếu có phoneme khác bắt đầu bằng ký tự này 
                                 ipa_units_recorded.append(ph)
                                 chars_consumed = 0
                                 for j in range(i + 1, min(i + len(ph), len(recorded_list))):
@@ -756,40 +806,28 @@ def compare_ipa_pairs(real_and_transcribed_words_ipa, strict_syllable_match: boo
                             if recorded_phoneme_idx <= actual_pos:
                                 recorded_phoneme_idx = actual_pos + 1
             
-            # KHÔNG cho phép fallback match từ vị trí xa
-            # Nếu không match trong syllable, phải là '0'
-            # Điều này đảm bảo tính chính xác: mỗi phoneme chỉ match trong syllable tương ứng
+            # Đặc biệt: nếu đây là phoneme cuối cùng, ưu tiên kiểm tra phoneme cuối cùng trong recorded
+            if not found_match and real_idx == len(ipa_units_real) - 1 and len(ipa_units_recorded) > 0:
+                # Tìm phoneme cuối cùng không phải underscore
+                for i in range(len(ipa_units_recorded) - 1, -1, -1):
+                    if ipa_units_recorded[i] != '_' and ipa_units_recorded[i] == real_phoneme:
+                        result.append('1')
+                        found_match = True
+                        break
+            
+            # Nếu chưa match và không strict, fallback tìm trong toàn bộ recorded (giữ thứ tự)
+            if not found_match and not strict_syllable_match:
+                for i in range(recorded_phoneme_idx, len(ipa_units_recorded)):
+                    rec_ph = ipa_units_recorded[i]
+                    if rec_ph != '_' and rec_ph == real_phoneme:
+                        result.append('1')
+                        recorded_phoneme_idx = i + 1
+                        found_match = True
+                        break
+
+            # Nếu vẫn không tìm được match, đánh '0'
             if not found_match:
                 result.append('0')
-                # Khi không match trong syllable, vẫn cần cập nhật recorded_phoneme_idx
-                # để bỏ qua phoneme tương ứng trong recorded và tiếp tục với phoneme tiếp theo
-                if syl_idx in syllable_results:
-                    rec_syl_idx = syllable_results[syl_idx]
-                    recorded_syllable = recorded_syllables[rec_syl_idx]
-                    recorded_syl_phonemes = split_ipa_into_phonemes(recorded_syllable)
-                    real_syl_start = sum(len(split_ipa_into_phonemes(real_syllables[i])) for i in range(syl_idx))
-                    offset_in_syl = real_idx - real_syl_start
-                    # Nếu offset hợp lệ và chưa vượt quá recorded syllable, tăng recorded_phoneme_idx
-                    # để bỏ qua phoneme ở vị trí offset trong recorded syllable
-                    if offset_in_syl < len(recorded_syl_phonemes):
-                        recorded_syl_start_in_units = 0
-                        for prev_syl_idx in range(rec_syl_idx):
-                            prev_recorded_syl = recorded_syllables[prev_syl_idx]
-                            prev_recorded_syl_phonemes = split_ipa_into_phonemes(prev_recorded_syl)
-                            recorded_syl_start_in_units += len(prev_recorded_syl_phonemes)
-                        recorded_phoneme_pos_in_units = recorded_syl_start_in_units + offset_in_syl
-                        # Tìm vị trí thực tế trong ipa_units_recorded (bỏ qua underscore)
-                        actual_pos = 0
-                        non_underscore_count = 0
-                        for idx, unit in enumerate(ipa_units_recorded):
-                            if unit != '_':
-                                if non_underscore_count == recorded_phoneme_pos_in_units:
-                                    actual_pos = idx
-                                    break
-                                non_underscore_count += 1
-                        if actual_pos < len(ipa_units_recorded):
-                            # Luôn tăng để bỏ qua phoneme này trong recorded
-                            recorded_phoneme_idx = actual_pos + 1
 		
         # Nếu có real_word, map từ phoneme sang chữ cái theo grapheme
         if real_word:
@@ -887,6 +925,30 @@ def compare_ipa_pairs(real_and_transcribed_words_ipa, strict_syllable_match: boo
                 letter_result = letter_result[:len(real_word)]
             elif len(letter_result) < len(real_word):
                 letter_result.extend(['0'] * (len(real_word) - len(letter_result)))
+
+            # Heuristic: các từ kết thúc bằng "te" (note, favorite, minute, ...) thường chỉ có âm /t/ ở cuối.
+            # Kiểm tra trực tiếp phoneme cuối cùng trong recorded IPA để đảm bảo chính xác.
+            if len(letter_result) >= 2 and real_word.lower().endswith('te'):
+                # Kiểm tra xem phoneme cuối của recorded có phải là 't' không
+                recorded_clean = recorded_ipa.replace('_', '').replace(' ', '')
+                recorded_phonemes = split_ipa_into_phonemes(recorded_clean)
+                real_phonemes = split_ipa_into_phonemes(real_ipa.replace('_', '').replace(' ', ''))
+                
+                # Nếu cả reference và recorded đều kết thúc bằng 't', đánh dấu cả 't' và 'e' là đúng
+                if recorded_phonemes and real_phonemes:
+                    last_recorded = recorded_phonemes[-1]
+                    last_real = real_phonemes[-1]
+                    if last_recorded == last_real == 't':
+                        last_score = '1'
+                    else:
+                        # Fallback: dùng kết quả từ phoneme_result
+                        last_score = phoneme_result[-1] if phoneme_result else '0'
+                else:
+                    last_score = phoneme_result[-1] if phoneme_result else '0'
+                
+                # Đảm bảo cả 't' và 'e' đều có cùng điểm
+                letter_result[-1] = last_score
+                letter_result[-2] = last_score
             return ''.join(letter_result)
 
         return ''.join(result)
