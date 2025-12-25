@@ -45,7 +45,7 @@ STT_API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-
 
 
 client = Client("lgtitony/doan")  # Nếu Space private: thêm hf_token="hf_xxx"
-EspeakWrapper.set_library('C:\Program Files\eSpeak NG\libespeak-ng.dll')
+EspeakWrapper.set_library(r'C:\Program Files\eSpeak NG\libespeak-ng.dll')
 # def generate_reference_phoneme(reference_text, language='en'):
 #     text = Punctuation(';:,.!"?()').remove(reference_text)
 #     ref_words = [w.lower() for w in text.strip().split(' ') if w]
@@ -300,6 +300,18 @@ def aiFeedback(reference_text, word_comparision_list):
     feedback = chat_completion.choices[0].message.content
     return feedback
 
+IPA_NORMALIZATION_MAP = {
+    'ɡ': 'g',  # unify script-g with plain g
+}
+
+def normalize_ipa_chars(ipa_string: str) -> str:
+    """
+    Chuẩn hóa một số ký tự IPA thường bị lệch mã (vd: ɡ ↔ g) để so sánh ổn định.
+    """
+    if not ipa_string:
+        return ''
+    return ''.join(IPA_NORMALIZATION_MAP.get(ch, ch) for ch in ipa_string)
+
 def split_ipa_into_phonemes(ipa_string):
     """
     Tách IPA thành các phoneme hoàn chỉnh, gồm diphthong, phụ âm ghép, và nguyên âm dài.
@@ -308,6 +320,7 @@ def split_ipa_into_phonemes(ipa_string):
     consonant_clusters = ['tʃ', 'dʒ']
     special_consonants = ['ʃ', 'ʒ', 'ŋ', 'θ', 'ð']
     
+    ipa_string = normalize_ipa_chars(ipa_string)
     ipa_clean = ipa_string.replace('_', '').replace(' ', '')
     if not ipa_clean:
         return []
@@ -350,6 +363,7 @@ def split_ipa_into_syllables(ipa_string):
     # Định nghĩa các nguyên âm IPA (vowels)
     vowels = set('aæɑɒeəɛiɪoɔuʊʌɚː')
     
+    ipa_string = normalize_ipa_chars(ipa_string)
     # Loại bỏ underscore và spaces để tách
     ipa_clean = ipa_string.replace('_', '').replace(' ', '')
     if not ipa_clean:
@@ -455,6 +469,7 @@ GRAPHEME_EXPECTED_PHONEMES = {
 	"ture": 3,
 	"sure": 3   ,
 	"te": 1,    # cụm 'te' cuối từ thường tương ứng 1 phoneme /t/
+    "ve": 1,
 }
 
 GRAPHEME_LETTER_TO_PHONEME_MAP = {
@@ -468,6 +483,7 @@ GRAPHEME_LETTER_TO_PHONEME_MAP = {
 	"te": [[0], [0]],
 	# 'wh' thường được phát âm là /w/ → cả w và h dùng chung phoneme
 	"wh": [[0], [0]],
+    "ve": [[0], [0]],
 }
 
 def grapheme_expected_phoneme_count(grapheme: str) -> int:
@@ -567,7 +583,7 @@ def apply_te_tail_heuristic(letter_result: list, real_word: str, phoneme_result:
 	Ensure words ending with 'te' show the same score for both 't' and 'e',
 	because they typically map to a single /t/ phoneme.
 	"""
-	if real_word and len(letter_result) >= 2 and real_word.lower().endswith('te'):
+	if real_word and len(letter_result) >= 2 and real_word.lower().endswith('te') or real_word.lower().endswith('ve'):
 		last_score = phoneme_result[-1] if phoneme_result else (letter_result[-1] if letter_result else '0')
 		letter_result[-1] = last_score
 		letter_result[-2] = last_score
@@ -589,6 +605,9 @@ def compare_ipa_pairs(real_and_transcribed_words_ipa, strict_syllable_match: boo
     if isinstance(real_words, str):
         real_words = real_words.split()
     def ipa_compare(real_ipa, recorded_ipa, real_word=None):
+        # Chuẩn hóa ký tự IPA để tránh lệch mã (vd: ɡ vs g)
+        real_ipa = normalize_ipa_chars(real_ipa)
+        recorded_ipa = normalize_ipa_chars(recorded_ipa)
         # Tách theo phoneme (nhận diện diphthong) thay vì từng ký tự
         ipa_units_real = split_ipa_into_phonemes(real_ipa)
         

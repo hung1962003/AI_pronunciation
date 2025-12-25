@@ -158,21 +158,21 @@ def lambda_handler(event, context):
 
 
 # Tạo bộ lọc Butterworth
-# def calculate_letter_accuracy(letter_string: str):
-#     """Return total letters, correct letters, and accuracy percent from 1/0 string."""
-#     if not letter_string:
-#         return 0, 0, 0
+def calculate_letter_accuracy(letter_string: str):
+    """Return total letters, correct letters, and accuracy percent from 1/0 string."""
+    if not letter_string:
+        return 0, 0, 0
 
-#     segments = [segment for segment in letter_string.strip().split(' ') if segment]
-#     total_letters = sum(len(segment) for segment in segments)
-#     correct_letters = sum(segment.count('1') for segment in segments)
+    segments = [segment for segment in letter_string.strip().split(' ') if segment]
+    total_letters = sum(len(segment) for segment in segments)
+    correct_letters = sum(segment.count('1') for segment in segments)
 
-#     if total_letters == 0:
-#         accuracy_percent = 0
-#     else:
-#         accuracy_percent = round((correct_letters / total_letters) * 100)
+    if total_letters == 0:
+        accuracy_percent = 0
+    else:
+        accuracy_percent = round((correct_letters / total_letters) * 100)
 
-#     return total_letters, correct_letters, accuracy_percent
+    return total_letters, correct_letters, accuracy_percent
 
 
 # def butter_filter(data, cutoff, sr, btype, order=4):

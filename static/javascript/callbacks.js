@@ -168,20 +168,39 @@ const getNextSample = async () => {
   }
 
   try {
+    // Get the current text from the UI (in case user has edited it)
+    let questionText = document.getElementById("original_script").innerHTML;
+    // Remove HTML tags
+    questionText = questionText.replace(/<[^>]*>?/gm, "");
+    // Remove spaces on the beginning and end
+    questionText = questionText.trim();
+    // Remove double spaces
+    questionText = questionText.replace(/\s\s+/g, " ");
+    
+    // If the text is empty or is the default placeholder, use a default
+    if (!questionText || questionText.includes("Click on the bar") || questionText.includes("generate a new sentence")) {
+      questionText = "hello world";
+    }
+
     await fetch(apiMainPathSample + "/getSample", {
       method: "post",
       body: JSON.stringify({
         category: sample_difficult.toString(),
         language: AILanguage,
-        question: " The two countries have a lot in common culturally", 
+        question: "under pressure", 
       }),
       headers: { "X-Api-Key": STScoreAPIKey },
     })
       .then((res) => res.json())
       .then((data) => {
         let doc = document.getElementById("original_script");
-        currentText = data.real_transcript;
-        doc.innerHTML = currentText;
+        // Handle real_transcript as array or string, but always store as array
+        if (Array.isArray(data.real_transcript)) {
+          currentText = data.real_transcript;
+        } else {
+          currentText = [data.real_transcript];
+        }
+        doc.innerHTML = currentText[0];
 
         currentIpa = data.ipa_transcript;
 

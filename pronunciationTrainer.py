@@ -97,8 +97,8 @@ class PronunciationTrainer:
         # real_and_transcribed_words, real_and_transcribed_words_ipa, mapped_words_indices = self.matchSampleAndRecordedWords(
         #     real_text, recording_transcript)
         # print('Time for matching transcripts: ', str(time.time()-start))
-        mapped_words_indices = self.matchSampleAndRecordedWords(real_text, recording_transcript)
-        print("mapped_words_indices: " + str(mapped_words_indices))
+        #mapped_words_indices = self.matchSampleAndRecordedWords(real_text, recording_transcript)
+        #print("mapped_words_indices: " + str(mapped_words_indices))
         # Handle case where recording_transcript is empty or very short
         if not recording_transcript or len(recording_transcript.strip()) <= 2:
             print("Warning: Very short or empty recording transcript")
@@ -111,7 +111,8 @@ class PronunciationTrainer:
         print("real_and_transcribed_words: " + str(real_and_transcribed_words))
         print("real_and_transcribed_words_ipa: "+ str(real_and_transcribed_words_ipa))
         # print("mapped_words_indices: " +str(mapped_words_indices))
-        start_time, end_time = self.getWordLocationsFromRecordInSeconds(word_locations, mapped_words_indices) 
+        # start_time, end_time = self.getWordLocationsFromRecordInSeconds(word_locations, mapped_words_indices) 
+        start_time, end_time = 0, 0
         pronunciation_accuracy, current_words_pronunciation_accuracy = self.getPronunciationAccuracy(
             real_and_transcribed_words_ipa)  # _ipa
         print("pronunciation_accuracy: " + str(pronunciation_accuracy))
