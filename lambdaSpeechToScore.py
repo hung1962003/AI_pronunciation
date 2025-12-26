@@ -108,14 +108,11 @@ def lambda_handler(event, context):
     real_and_transcribed_words_ipa = result['real_and_transcribed_words_ipa']
     print(4)
     print(real_and_transcribed_words_ipa)
-    real_transcripts = ' '.join(
-        [word[0] for word in result['real_and_transcribed_words']])
-    matched_transcripts = ' '.join(
-        [word[1] for word in result['real_and_transcribed_words']])
+    
+    # real_and_transcribed_words không còn được tạo, dùng fallback
+    real_transcripts = result['real_text']  # Dùng real_text thay vì real_and_transcribed_words
+    matched_transcripts = ' '.join([word[1] if word[1] != '-' else word[0] for word in result['real_and_transcribed_words_ipa']])  # Fallback từ IPA
 
-    words_real = real_transcripts.lower().split()
-    mapped_words = matched_transcripts.split()
-    is_letter_correct_all_words = ''
     is_letter_correct_all_words = function.compare_ipa_pairs(
         real_and_transcribed_words_ipa,
         return_as_string=True,

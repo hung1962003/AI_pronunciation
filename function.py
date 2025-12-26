@@ -316,9 +316,9 @@ def split_ipa_into_phonemes(ipa_string):
     """
     Tách IPA thành các phoneme hoàn chỉnh, gồm diphthong, phụ âm ghép, và nguyên âm dài.
     """
-    diphthongs = ['aɪ', 'aʊ', 'eɪ', 'oɪ', 'oʊ', 'ɔɪ', 'ɪə', 'ʊə', 'eə']
-    consonant_clusters = ['tʃ', 'dʒ']
-    special_consonants = ['ʃ', 'ʒ', 'ŋ', 'θ', 'ð']
+    diphthongs = ['aɪ', 'aʊ', 'eɪ', 'oɪ', 'oʊ', 'ɔɪ', 'ɪə', 'ʊə', 'eə']# nguyên âm đôi
+    consonant_clusters = ['tʃ', 'dʒ']#cụm phụ âm
+    special_consonants = ['ʃ', 'ʒ', 'ŋ', 'θ', 'ð']#phụ âm đặc biệt
     
     ipa_string = normalize_ipa_chars(ipa_string)
     ipa_clean = ipa_string.replace('_', '').replace(' ', '')

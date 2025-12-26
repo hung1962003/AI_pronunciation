@@ -187,7 +187,7 @@ const getNextSample = async () => {
       body: JSON.stringify({
         category: sample_difficult.toString(),
         language: AILanguage,
-        question: "under pressure", 
+        question: "my brother is under pressure", 
       }),
       headers: { "X-Api-Key": STScoreAPIKey },
     })

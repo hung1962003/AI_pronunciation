@@ -82,37 +82,21 @@ class PronunciationTrainer:
         recording_ipa = function.get_phonemes(recordedAudio)
         print("Debug - recording_ipa:", recording_ipa)
         print("Debug - real_text:", real_text)
-        recording_transcript = function.ipa_to_english(recording_ipa, real_text)
-        print("Debug - recording_transcript after ipa_to_english:", recording_transcript)
-        word_locations= self.getAudioTranscript(recordedAudio1)
-        print ("Debug - word_locations:", word_locations)
-        print(1)
-        print("recording_transcript: " + recording_transcript)
-        print("recording_ipa: " + recording_ipa)
-        print("word_locations: " + str(word_locations))
+        
         lambda_ipa_converter = {}
         lambda_ipa_converter[language] =RuleBasedModels.get_phonem_converter(language)
         reference_ipa = lambda_ipa_converter[language].convertToPhonem(real_text)
         print("reference_ipa: "+ str(reference_ipa))
-        # real_and_transcribed_words, real_and_transcribed_words_ipa, mapped_words_indices = self.matchSampleAndRecordedWords(
-        #     real_text, recording_transcript)
-        # print('Time for matching transcripts: ', str(time.time()-start))
-        #mapped_words_indices = self.matchSampleAndRecordedWords(real_text, recording_transcript)
-        #print("mapped_words_indices: " + str(mapped_words_indices))
-        # Handle case where recording_transcript is empty or very short
-        if not recording_transcript or len(recording_transcript.strip()) <= 2:
-            print("Warning: Very short or empty recording transcript")
-            # Create fallback alignment
-            real_words = real_text.split()
-            real_and_transcribed_words = [(word, '-') for word in real_words]
-        else:        
-            real_and_transcribed_words = function.align_real_and_transcribed(real_text, recording_transcript)  
+        
+        # Chỉ cần real_and_transcribed_words_ipa để so sánh phoneme
         real_and_transcribed_words_ipa = function.getComparationPhonemes(reference_ipa, recording_ipa)
-        print("real_and_transcribed_words: " + str(real_and_transcribed_words))
         print("real_and_transcribed_words_ipa: "+ str(real_and_transcribed_words_ipa))
-        # print("mapped_words_indices: " +str(mapped_words_indices))
-        # start_time, end_time = self.getWordLocationsFromRecordInSeconds(word_locations, mapped_words_indices) 
-        start_time, end_time = 0, 0
+        
+        # Không cần recording_transcript, real_and_transcribed_words, start_time, end_time
+        # Vì frontend chỉ dùng IPA và không cần phát audio theo từ
+        recording_transcript = ""
+        real_and_transcribed_words = []
+        start_time, end_time = "", ""
         pronunciation_accuracy, current_words_pronunciation_accuracy = self.getPronunciationAccuracy(
             real_and_transcribed_words_ipa)  # _ipa
         print("pronunciation_accuracy: " + str(pronunciation_accuracy))
