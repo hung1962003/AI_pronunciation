@@ -2,7 +2,6 @@
 
 An AI-powered web app for scoring English pronunciation. The learner reads a reference sentence, the app records it, recognizes the speech, compares IPA phoneme by phoneme, and returns a score, per-letter correctness, and corrective feedback.
 
-![Main screen](images/MainScreen.jpg)
 
 ## Features
 
